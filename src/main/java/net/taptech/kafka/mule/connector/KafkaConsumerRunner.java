@@ -14,6 +14,7 @@ import org.slf4j.LoggerFactory;
 import java.util.Arrays;
 import java.util.Properties;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public class KafkaConsumerRunner implements Runnable {
     private static Logger logger = LoggerFactory.getLogger(KafkaConsumerRunner.class);
@@ -22,6 +23,7 @@ public class KafkaConsumerRunner implements Runnable {
 
 
     private final AtomicBoolean closed = new AtomicBoolean(false);
+    private final AtomicInteger count = new AtomicInteger(0);
     private KafkaConsumer<String, String> consumer;
     private Properties consumerProperties;
     private SourceCallback sourceCallback;
@@ -31,28 +33,21 @@ public class KafkaConsumerRunner implements Runnable {
         this.sourceCallback = sourceCallback;
         this.consumer = new KafkaConsumer<>(consumerProperties);
         String [] topicsArray = consumerProperties.getProperty(KafkaConnectorConstants.CONSUMER_TOPICS).split(",");
-        logger.trace("KafkaConsumerRunner Subscribing to topics {} ",topicsArray);
+        logger.trace("KafkaConsumerRunner # {} Subscribing to topics {} ",count.incrementAndGet(),topicsArray);
         consumer.subscribe(Arrays.asList(topicsArray));
     }
 
     public void run() {
         try {
 
-            /*
             while (!closed.get()) {
                 Integer pollTimeOut = Integer.valueOf(consumerProperties.getProperty(KafkaConnectorConstants.CONSUMER_POLL_TIMEOUT));
-                ConsumerRecords records = consumer.poll(pollTimeOut);
-                // Handle new records
-                sourceCallback.process(records);
-            }
-            */
-            while (true) {
-                Integer pollTimeOut = Integer.valueOf(consumerProperties.getProperty(KafkaConnectorConstants.CONSUMER_POLL_TIMEOUT));
-                ConsumerRecords<String, String> records = consumer.poll(pollTimeOut);
+                ConsumerRecords<?, ?> records = consumer.poll(pollTimeOut);
                 if (logger.isDebugEnabled()){
-                    logger.debug("Number of consumer records returned {} from partitions {}",records.count(),records.partitions());
-                    for (ConsumerRecord<String, String> record : records) {
-                        System.out.printf("offset = %d, key = %s, value = %s%n", record.offset(), record.key(), record.value());
+
+                    logger.debug("Number of topic {} consumer records returned {} from partitions {}",new Object[]{consumerProperties.getProperty(KafkaConnectorConstants.CONSUMER_TOPICS),records.count(),records.partitions()});
+                    for (ConsumerRecord<?, ?> record : records) {
+                        System.out.printf("partition = %s,offset = %d, key = %s, value = %s%n",record.partition(), record.offset(), record.key(), record.value());
                     }
 
                 }

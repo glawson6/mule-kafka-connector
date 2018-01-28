@@ -39,3 +39,8 @@ buildNumber.properties
 mule-kafka-connector.iml
 mule-kafka-connector.iws
 mule-kafka-connector.ipr
+
+.classpath
+.settings/
+.apt_generated/
+.factorypath

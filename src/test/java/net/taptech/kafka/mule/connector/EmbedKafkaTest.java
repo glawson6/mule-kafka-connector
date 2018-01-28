@@ -32,10 +32,11 @@ public class EmbedKafkaTest {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(EmbedKafkaTest.class);
 
-    @ClassRule
-    public static KafkaEmbedded embeddedKafka = new KafkaEmbedded(2, true, 2, "messages");
+    //@ClassRule
+    //public static KafkaEmbedded embeddedKafka = new KafkaEmbedded(2, true, 2, "messages");
+    public static KafkaEmbedded embeddedKafka = null;
 
-    @Test
+    //@Test
     public void testSpringKafka() throws Exception {
         Map<String, Object> consumerProps = KafkaTestUtils.consumerProps("sampleConsumer", "false", embeddedKafka);
         consumerProps.put("auto.offset.reset", "earliest");
@@ -100,7 +101,7 @@ public class EmbedKafkaTest {
         container.stop();
     }
 
-    @Test
+    //@Test
     public void testEmbeddedRawKafka() throws Exception {
 
 
