@@ -44,3 +44,5 @@ mule-kafka-connector.ipr
 .settings/
 .apt_generated/
 .factorypath
+dependencies.txt
+dev-notes.txt

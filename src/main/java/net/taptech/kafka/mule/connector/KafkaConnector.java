@@ -8,6 +8,7 @@ import net.taptech.kafka.mule.connector.config.ConnectorConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.clients.producer.RecordMetadata;
+import org.apache.kafka.common.header.Header;
 import org.mule.api.annotations.*;
 import org.mule.api.annotations.lifecycle.Start;
 import org.mule.api.annotations.lifecycle.Stop;
@@ -20,10 +21,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.core.io.DefaultResourceLoader;
 import org.springframework.core.io.ResourceLoader;
 
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
-import java.util.Properties;
+import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -180,7 +178,7 @@ public class KafkaConnector {
     }
 
     @Source(name = "Consumer", friendlyName = "Consumer")
-    public void consumer(SourceCallback callback, @Optional String topic, @Optional String propertyFileOverrides) {
+    public void consumer(SourceCallback callback, @Optional String topic, @Optional String propertyFileOverrides, @Optional Integer threads) {
         logger.info("consumer Creating simpleConsumer with propertyFileOverrides {}", propertyFileOverrides);
         Integer delay = DEFAULT_DELAY;
         String[] topicsArray = consumerProperties.getProperty(KafkaConnectorConstants.CONSUMER_TOPICS).split(",");
@@ -188,9 +186,19 @@ public class KafkaConnector {
         if (null != topic) {
             properties.put(KafkaConnectorConstants.CONSUMER_TOPICS, topic);
         }
-        KafkaConsumerRunner runner = new KafkaConsumerRunner(properties, callback);
-        logger.debug("consumer Subscribing to topics {} with properties", topicsArray, properties);
-        consumerPool.submit(runner);
+
+        if (null == threads) {
+            threads = 1;
+        } else if (threads < 1) {
+            threads = 1;
+        }
+
+        for (int i = 0; i < threads; i++) {
+            KafkaConsumerRunner runner = new KafkaConsumerRunner(properties, callback);
+            consumerPool.submit(runner);
+        }
+        logger.debug("creating {} consumer(s) Subscribing to topics {} with properties",new Object[]{threads, topicsArray, properties});
+
     }
 
 
@@ -215,7 +223,7 @@ public class KafkaConnector {
 
 
     @Processor(name = "Producer", friendlyName = "Producer")
-    public List<RecordMetadata> producer(@Optional String topic, String key, String message, @Optional String propertyFileOverrides) throws ExecutionException, InterruptedException, EndpointException {
+    public List<RecordMetadata> producer(@Optional Integer partition, @Optional String topic, String key, String message, @Optional String propertyFileOverrides, @Optional Map<String, Object> headers) throws ExecutionException, InterruptedException, EndpointException {
         Properties properties = determineProperties(getProducerProperties(), propertyFileOverrides);
         if (null == topic) {
             topic = properties.getProperty(KafkaConnectorConstants.PRODUCER_TOPIC);
@@ -223,12 +231,14 @@ public class KafkaConnector {
         if (null == topic) {
             throw new EndpointException(MessageFactory.createStaticMessage("Topic cannot be null. Either pass in producer XMl or put 'producer.topic' in configuration file'"));
         }
-        ProducerRecord producerRecord = new ProducerRecord(topic, key, message);
+        Collection<Header> extractedHeaders = KafkaUtils.extractHeaders(headers);
+        ProducerRecord producerRecord = new ProducerRecord(topic, partition, key, message, extractedHeaders);
         logger.debug("Using producer record {} with properties {}", producerRecord, properties);
         List<ProducerRecord> producerRecords = Collections.singletonList(producerRecord);
         KafkaProducerRunner runner = new KafkaProducerRunner(properties, producerRecords);
         Future<List<RecordMetadata>> results = producerPool.submit(runner);
         return results.get();
     }
+
 
 }
